@@ -1,6 +1,7 @@
 import pandas as pd
 import graphviz
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
 # 그래프
 def get_graph(df):
@@ -160,8 +161,13 @@ def get_graph(df):
 
 # 바 차트
 def get_barchart(df, category, type):
-    plt.rcParams['font.family'] ='Malgun Gothic'
+#     plt.rcParams['font.family'] ='Malgun Gothic'
+#     plt.rcParams['axes.unicode_minus'] =False    
+    path='MALGUN.TTF'
+    font=fm.FontProperties(fname=path).get_name()
+    plt.rcParams['font.family'] = font
     plt.rcParams['axes.unicode_minus'] =False
+
     df_subset = df[df['카테고리']==category][['경험','채용공고 %', '유저 데이터 %', 'color']]
 
     fig, ax = plt.subplots(figsize=(4,4))
