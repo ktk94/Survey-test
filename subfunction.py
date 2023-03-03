@@ -1,4 +1,5 @@
 import pandas as pd
+import streamlit as st
 import graphviz
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
@@ -230,6 +231,7 @@ def get_df(ans_list):
 
     return df
 
+# 강점, 약점 연산
 def get_user_category(df):
     ability={
         '서비스 기획' : ['웹 서비스 기획', 'UX/UI 기획'],
@@ -265,3 +267,70 @@ def get_user_category(df):
     
     return strength, weekness
     
+# 요약 탭
+def summary_tab(df, user_name, position):
+    # 채용공고 수, 역량 개수, 유저 데이터 수, 유저 데이터 평균
+    data={
+        'PO/PM' : ['2,377', '25', '237', '7'],
+        '서비스 기획자' : ['4,000', '30', '300', '10']
+    }
+    ability_cnt=len(df[df['응답']=='Y'])
+
+    st.subheader("요약")
+    st.write(f"""
+        채용공고 `{data[position][0]}`개 분석 결과, `{position}`에게 필요한 주요 역량은 `{data[position][1]}`개 입니다.\n
+        `{user_name}`님은 이중 `{ability_cnt}`개 역량을 가지고 있네요.\n
+        동료 `{position}` `{data[position][2]}`명의 평균과 비교했을 때 `{abs(ability_cnt-int(data[position][3]))}`개 `{'많은' if ability_cnt-int(data[position][3])>0 else '적은'}` 수준이에요.
+        """)
+
+    st.subheader("내 강점과 약점은?")
+    strength, weekness=get_user_category(df)
+    if len(strength)>1 & len(weekness)>1 :
+        st.write(f"""
+            채용공고와 동료의 역량 진단 결과를 종합적으로 분석했을 때\n
+            {user_name} 님은 `{(', ').join(strength)}` 역량이 뛰어나네요!\n
+            `{(', ').join(weekness)}` 역량을 키우면 더욱 경쟁력이 생길 거예요.
+        """)
+
+    elif len(strength)>1:
+        st.write(f"""
+            채용공고와 동료의 역량 진단 결과를 종합적으로 분석했을 때\n
+            `{user_name}` 님은 `{(', ').join(strength)}` 역량이 뛰어나네요!
+        """)
+    elif len(weekness)>1:
+        st.write(f"""
+            채용공고와 동료의 역량 진단 결과를 종합적으로 분석했을 때\n
+            `{(', ').join(weekness)}` 역량을 키우면 더욱 경쟁력이 생길 거예요.
+        """)
+
+    st.write('자세한 진단 결과는 다른 탭을 눌러 확인해보세요.')
+
+    graph = get_graph(df)
+    st.graphviz_chart(graph)
+
+# 카테고리 탭
+def tab(df, category):
+    disc={
+        '서비스 기획' : '`서비스 기획` 역량은 서비스 구현에 필요한 기능, 정책, 화면 등을 상세히 설계할 수 있는 것을 뜻해요.',
+        '데이터 문해' : '`데이터 문해` 역량은 어쩌구 저쩌구',
+        '리서치' : '`리서치` 역량은 어쩌구 저쩌구',
+        '프로젝트 관리' : '`프로젝트 관리` 역량은 어쩌구 저쩌구',
+        '프로덕트 관리' : '`프로덕트 관리` 역량은 어쩌구 저쩌구',
+    }
+    ability={
+        '서비스 기획' : ['웹 서비스 기획', 'UX/UI 기획'],
+        '데이터 문해' : ['데이터 분석', '데이터 기반 의사결정'],
+        '리서치' : ['A/B 테스트', '사용자 조사'],
+        '프로젝트 관리' : ['유관부서와 협업', '프로젝트 리딩'], 
+        '프로덕트 관리' : ['서비스 운영', '서비스 출시']
+    }
+
+    st.subheader(category)
+    st.write(disc[category])
+    barchart1=get_barchart(df, category, '채용공고')
+    st.pyplot(barchart1)
+
+    st.subheader('다른 사람과 비교했을 때 나는?')
+    st.write(f'역량 진단을 진행한 동료가 가지고 있는 상위 2개 역량은\n `{ability[category][0]}`, `{ability[category][1]}` 입니다.')
+    barchart2=get_barchart(df, category, '유저 데이터')
+    st.pyplot(barchart2)
