@@ -17,6 +17,10 @@ year_experience_mapping = {
     '만 5년 이상 10년 미만': 7
 }
 data2['연차_순서'] = data2['연차'].map(year_experience_mapping)
+개발자 = data2[data2['참가 직군'] == '개발']
+개발자 = 개발자[개발자['개발_참가 분야'].isin(['백엔드', '프론트엔드 (Web)', '프론트엔드 (App)'])]
+개발자['개발_참가 분야'] = 개발자['개발_참가 분야'].replace({'프론트엔드 (Web)': '프론트엔드', '프론트엔드 (App)': '프론트엔드'})
+data2=pd.concat([data2[data2['참가 직군']!='개발'],개발자])
 st.title('추천 멤버 제안 3가지 방안')
 target_user_id=st.text_input('추천 받고자 하는 유저 ID')
 n_recommendation=st.number_input('받고 싶은 추천 멤버 수(1~10)',min_value=1,max_value=10,step=1)
@@ -37,84 +41,119 @@ if target_user_id:
         st.markdown(f'##### **유저의 연차** :<span style="color: blue">**{연차}**</span>', unsafe_allow_html=True)
 ##연차만 이용한 추천
 def career_month_recommend(target_id, n_recommendations=2):
-    target_user_job = data2.loc[data['유저아이디'] == target_id, '참가 직군'].values[0]
-    target_user_experience_order = data2.loc[data['유저아이디'] == target_id, '연차_순서'].values[0]
-    
-    if target_user_job == '기획':
-        required_jobs = ['디자인', '개발']
-    elif target_user_job == '디자인':
-        required_jobs = ['기획', '개발']
-    else:  # 개발자인 경우
-        required_jobs = ['기획', '디자인', '개발']  # 개발자도 포함해야 하는 경우를 고려
-        
-    filtered_users_by_job = data2[data2['참가 직군'].isin(required_jobs)]
-    
-    recommended_users_by_job_and_experience = {}
-    for job in required_jobs:
-        job_specific_users = data2[(data2['참가 직군'] == job) & (data2['유저아이디'] != target_id)]
-        job_specific_distances = abs(job_specific_users['연차_순서'] - target_user_experience_order)
-        recommended_indices = job_specific_distances.nsmallest(n_recommendations).index
-        recommended_users = job_specific_users.loc[recommended_indices]
-        recommended_users_by_job_and_experience[job] = recommended_users
+    # 대상 사용자 정보 확인
+    target_user_info = data2.loc[data2['유저아이디'] == target_id, ['참가 직군', '개발_참가 분야', '연차_순서']].iloc[0]
+    target_user_job = target_user_info['참가 직군']
+    target_user_dev_field = target_user_info['개발_참가 분야']
+    target_user_experience_order = target_user_info['연차_순서']
 
-    # 각 직군별 추천된 사용자들을 데이터 프레임으로 변환
-    recommended_df = pd.concat(recommended_users_by_job_and_experience.values(), ignore_index=True)
+    # 필요한 직군 및 개발 분야 정의
+    required_fields = []
+    if target_user_job == '기획':
+        required_fields = [('디자인', None), ('개발', '프론트엔드'), ('개발', '백엔드')]
+    elif target_user_job == '디자인':
+        required_fields = [('기획', None), ('개발', '프론트엔드'), ('개발', '백엔드')]
+    elif target_user_job == '개발':
+        if target_user_dev_field == '백엔드':
+            required_fields = [('기획', None), ('디자인', None), ('개발', '프론트엔드')]
+        elif target_user_dev_field == '프론트엔드':
+            required_fields = [('기획', None), ('디자인', None), ('개발', '백엔드')]
+
+    recommended_users = []
+    for job, dev_field in required_fields:
+        # 조건에 맞는 사용자 필터링
+        if dev_field:
+            filtered_users = data2[(data2['참가 직군'] == job) & (data2['개발_참가 분야'] == dev_field)]
+        else:
+            filtered_users = data2[data2['참가 직군'] == job]
+
+        # 연차 차이 계산 및 가장 비슷한 사용자 추천
+        experience_diff = abs(filtered_users['연차_순서'] - target_user_experience_order)
+        recommended_indices = experience_diff.nsmallest(n_recommendations).index
+        recommended_users.extend(filtered_users.loc[recommended_indices].to_dict('records'))
+
+    # 추천된 사용자들을 데이터 프레임으로 변환
+    recommended_df = pd.DataFrame(recommended_users)
     return recommended_df
+
 ## 참가시간만 이용한 추천
 def participation_time_recommend(target_id, n_recommendations=2):
-    # 대상 사용자의 직군과 총 투입 가능 시간 확인
-    target_user_job = data2.loc[data2['유저아이디'] == target_id, '참가 직군'].values[0]
-    target_user_available_time = data2.loc[data2['유저아이디'] == target_id, '총 투입 가능 시간'].values[0]
+    # 대상 사용자 정보 확인
+    target_user_info = data2.loc[data2['유저아이디'] == target_id, ['참가 직군', '개발_참가 분야', '총 투입 가능 시간']].iloc[0]
+    target_user_job = target_user_info['참가 직군']
+    target_user_dev_field = target_user_info['개발_참가 분야']
+    target_user_available_time = target_user_info['총 투입 가능 시간']
 
-    # 필요한 직군 정의
+    # 필요한 직군 및 개발 분야 정의
+    required_fields = []
     if target_user_job == '기획':
-        required_jobs = ['디자인', '개발']
+        required_fields = [('디자인', None), ('개발', '프론트엔드'), ('개발', '백엔드')]
     elif target_user_job == '디자인':
-        required_jobs = ['기획', '개발']
-    else:  # 개발자인 경우
-        required_jobs = ['기획', '디자인', '개발']
+        required_fields = [('기획', None), ('개발', '프론트엔드'), ('개발', '백엔드')]
+    elif target_user_job == '개발':
+        if target_user_dev_field == '백엔드':
+            required_fields = [('기획', None), ('디자인', None), ('개발', '프론트엔드')]
+        elif target_user_dev_field == '프론트엔드':
+            required_fields = [('기획', None), ('디자인', None), ('개발', '백엔드')]
 
-    recommended_users_by_job_and_time = {}
-    for job in required_jobs:
-        job_specific_users = data2[(data2['참가 직군'] == job) & (data2['유저아이디'] != target_id)]
-        job_specific_time_diff = abs(job_specific_users['총 투입 가능 시간'].astype(int) - int(target_user_available_time))
-        recommended_indices = job_specific_time_diff.nsmallest(n_recommendations).index
-        recommended_users = job_specific_users.loc[recommended_indices,]
-        recommended_users_by_job_and_time[job] = recommended_users
+    recommended_users = []
+    for job, dev_field in required_fields:
+        # 조건에 맞는 사용자 필터링
+        if dev_field:
+            filtered_users = data2[(data2['참가 직군'] == job) & (data2['개발_참가 분야'] == dev_field)]
+        else:
+            filtered_users = data2[data2['참가 직군'] == job]
 
-    # 각 직군별 추천된 사용자들을 데이터 프레임으로 변환
-    recommended_df = pd.concat(recommended_users_by_job_and_time.values(), ignore_index=True)
+        # 시간 차이 계산 및 가장 가까운 사용자 추천
+        time_diff = abs(filtered_users['총 투입 가능 시간'].astype(int) - int(target_user_available_time))
+        recommended_indices = time_diff.nsmallest(n_recommendations).index
+        recommended_users.extend(filtered_users.loc[recommended_indices].to_dict('records'))
+
+    # 추천된 사용자들을 데이터 프레임으로 변환
+    recommended_df = pd.DataFrame(recommended_users)
     return recommended_df
 ## 연차+참가시간을 고려한 추천
 def comprehensive_recommend(target_id, n_recommendations=2):
-    # 대상 사용자의 직군, 연차 순서, 총 투입 가능 시간 확인
-    target_user_job = data2.loc[data2['유저아이디'] == target_id, '참가 직군'].values[0]
-    target_user_experience_order = data2.loc[data2['유저아이디'] == target_id, '연차_순서'].values[0]
-    target_user_available_time = data2.loc[data2['유저아이디'] == target_id, '총 투입 가능 시간'].values[0]
+    # 대상 사용자 정보 확인
+    target_user_info = data2.loc[data2['유저아이디'] == target_id, ['참가 직군', '개발_참가 분야', '연차_순서', '총 투입 가능 시간']].iloc[0]
+    target_user_job = target_user_info['참가 직군']
+    target_user_dev_field = target_user_info['개발_참가 분야']
+    target_user_vector = np.array([target_user_info['연차_순서'], target_user_info['총 투입 가능 시간']])
 
-    # 대상 사용자의 벡터 생성
-    target_user_vector = np.array([target_user_experience_order, target_user_available_time])
-
-    # 필요한 직군 정의
+    # 필요한 직군 및 개발 분야 정의 (대상 사용자의 직군은 제외)
+    required_fields = []
     if target_user_job == '기획':
-        required_jobs = ['디자인', '개발']
+        required_fields.extend([('디자인', None), ('개발', '프론트엔드'), ('개발', '백엔드')])
     elif target_user_job == '디자인':
-        required_jobs = ['기획', '개발']
-    else:  # 개발자인 경우
-        required_jobs = ['기획', '디자인', '개발']
+        required_fields.extend([('기획', None), ('개발', '프론트엔드'), ('개발', '백엔드')])
+    elif target_user_job == '개발':
+        if target_user_dev_field == '백엔드':
+            required_fields.extend([('기획', None), ('디자인', None), ('개발', '프론트엔드')])
+        elif target_user_dev_field == '프론트엔드':
+            required_fields.extend([('기획', None), ('디자인', None), ('개발', '백엔드')])
 
-    recommended_users_by_job_and_comprehensive = {}
-    for job in required_jobs:
-        job_specific_users = data2[(data2['참가 직군'] == job) & (data2['유저아이디'] != target_id)]
-        job_specific_vectors = job_specific_users[['연차_순서', '총 투입 가능 시간']].to_numpy()
-        distances = np.linalg.norm(job_specific_vectors - target_user_vector, axis=1)
+    recommended_users = []
+    for job, dev_field in required_fields:
+        # 조건에 맞는 사용자 필터링 (대상 사용자의 직군 제외)
+        if dev_field:
+            filtered_users = data2[(data2['참가 직군'] == job) & (data2['개발_참가 분야'] == dev_field) & (data2['유저아이디'] != target_id)]
+        else:
+            filtered_users = data2[(data2['참가 직군'] == job) & (data2['유저아이디'] != target_id)]
+
+        # 사용자 벡터 생성 및 대상 사용자와의 거리 계산
+        user_vectors = filtered_users[['연차_순서', '총 투입 가능 시간']].to_numpy()
+        distances = np.linalg.norm(user_vectors - target_user_vector, axis=1)
+
+        # 가장 가까운 사용자 추천
         recommended_indices = np.argsort(distances)[:n_recommendations]
-        recommended_users = job_specific_users.iloc[recommended_indices, :]
-        recommended_users_by_job_and_comprehensive[job] = recommended_users
+        recommended_users.extend(filtered_users.iloc[recommended_indices].to_dict('records'))
 
-    # 각 직군별 추천된 사용자들을 데이터 프레임으로 변환
-    recommended_df = pd.concat(recommended_users_by_job_and_comprehensive.values(), ignore_index=True)
+    # 추천된 사용자들을 데이터 프레임으로 변환 및 중복 제거
+    recommended_df = pd.DataFrame(recommended_users).drop_duplicates().head(n_recommendations * len(required_fields))
     return recommended_df
+
+
+
 
 if target_user_id:
     try:
