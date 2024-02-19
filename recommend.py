@@ -35,10 +35,22 @@ st.sidebar.subheader("유저 리스트")
 st.sidebar.dataframe(data2[['유저아이디','참가 직군','연차']])
 if target_user_id:
     if target_user_id in data2['유저아이디'].values:
-        참가직군 = data2[data2['유저아이디'] == target_user_id]['참가 직군'].values[0]
-        연차 = data2[data2['유저아이디'] == target_user_id]['연차'].values[0]
-        st.markdown(f'##### **유저의 참가 직군**: <span style="color: blue">**{참가직군}** </span>', unsafe_allow_html=True)
-        st.markdown(f'##### **유저의 연차** :<span style="color: blue">**{연차}**</span>', unsafe_allow_html=True)
+        if data2[data2['유저아이디']==target_user_id]['참가 직군'].values[0]=='개발':
+            참가직군 = data2[data2['유저아이디'] == target_user_id]['참가 직군'].values[0]
+            개발_참가=data2[data2['유저아이디']==target_user_id]['개발_참가 분야'].values[0]
+            연차 = data2[data2['유저아이디'] == target_user_id]['연차'].values[0]
+            투입시간=data2[data2['유저아이디']==target_user_id]['총 투입 가능 시간'].values[0]
+            st.markdown(f'##### **유저의 참가 직군**: <span style="color: blue">**{참가직군}({개발_참가})** </span>', unsafe_allow_html=True)
+            st.markdown(f'##### **유저의 연차** :<span style="color: blue">**{연차}**</span>', unsafe_allow_html=True)
+            st.markdown(f'##### **유저의 투입시간** :<span style="color: blue">**{투입시간}**</span>', unsafe_allow_html=True)
+        else:
+            참가직군 = data2[data2['유저아이디'] == target_user_id]['참가 직군'].values[0]
+            연차 = data2[data2['유저아이디'] == target_user_id]['연차'].values[0]
+            투입시간=data2[data2['유저아이디']==target_user_id]['총 투입 가능 시간'].values[0]
+            st.markdown(f'##### **유저의 참가 직군**: <span style="color: blue">**{참가직군}** </span>', unsafe_allow_html=True)
+            st.markdown(f'##### **유저의 연차** :<span style="color: blue">**{연차}**</span>', unsafe_allow_html=True)
+            st.markdown(f'##### **유저의 투입시간** :<span style="color: blue">**{투입시간}**</span>', unsafe_allow_html=True)
+        
 ##연차만 이용한 추천
 def career_month_recommend(target_id, n_recommendations=2):
     # 대상 사용자 정보 확인
